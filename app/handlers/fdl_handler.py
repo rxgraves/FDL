@@ -10,19 +10,16 @@ logger = logging.getLogger("fdl_handler")
 async def media_listener(client, message):
     code = secrets.token_urlsafe(6)[:6]
     mime_type = "application/octet-stream"
-    is_audio = False
     if message.document:
         mime_type = message.document.mime_type or "application/octet-stream"
     elif message.video:
         mime_type = "video/mp4"
     elif message.audio:
         mime_type = message.audio.mime_type or "audio/mpeg"
-        is_audio = True
     elif message.photo:
         mime_type = "image/jpeg"
     elif message.voice:
         mime_type = "audio/ogg"
-        is_audio = True
 
     try:
         sent = await message.forward(LOG_CHANNEL_ID)
@@ -44,20 +41,11 @@ async def media_listener(client, message):
         stream_url = WEB_BASE_URL.rstrip("/") + f"/stream/{file_id}?code={code}"
         download_url = WEB_BASE_URL.rstrip("/") + f"/dl/{file_id}?code={code}"
 
-        buttons = [
-            InlineKeyboardButton("▶️ Stream", url=stream_url),
-            InlineKeyboardButton("⬇️ Download", url=download_url)
-        ]
-        if is_audio:
-            player_url = WEB_BASE_URL.rstrip("/") + f"/player/{file_id}?code={code}"
-            buttons.insert(1, InlineKeyboardButton("🎵 Play", url=player_url))
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("▶️ Stream", url=stream_url), InlineKeyboardButton("⬇️ Download", url=download_url)]
+        ])
 
-        keyboard = InlineKeyboardMarkup([buttons])
-
-        text = f"Links for the media:\n\n• Stream: {stream_url}\n"
-        if is_audio:
-            text += f"• Play: {player_url}\n"
-        text += f"• Download: {download_url}"
+        text = f"Links for the media:\n\n• Stream: {stream_url}\n• Download: {download_url}"
         await message.reply_text(text, reply_markup=keyboard, quote=True)
         logger.info(f"Generated links for file_id: {file_id}")
     except Exception as e:
@@ -75,19 +63,16 @@ async def fdl_command(client, message):
 
     code = secrets.token_urlsafe(6)[:6]
     mime_type = "application/octet-stream"
-    is_audio = False
     if replied.document:
         mime_type = replied.document.mime_type or "application/octet-stream"
     elif replied.video:
         mime_type = "video/mp4"
     elif replied.audio:
         mime_type = replied.audio.mime_type or "audio/mpeg"
-        is_audio = True
     elif replied.photo:
         mime_type = "image/jpeg"
     elif replied.voice:
         mime_type = "audio/ogg"
-        is_audio = True
 
     try:
         sent = await replied.forward(LOG_CHANNEL_ID)
@@ -109,20 +94,11 @@ async def fdl_command(client, message):
         stream_url = WEB_BASE_URL.rstrip("/") + f"/stream/{file_id}?code={code}"
         download_url = WEB_BASE_URL.rstrip("/") + f"/dl/{file_id}?code={code}"
 
-        buttons = [
-            InlineKeyboardButton("▶️ Stream", url=stream_url),
-            InlineKeyboardButton("⬇️ Download", url=download_url)
-        ]
-        if is_audio:
-            player_url = WEB_BASE_URL.rstrip("/") + f"/player/{file_id}?code={code}"
-            buttons.insert(1, InlineKeyboardButton("🎵 Play", url=player_url))
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("▶️ Stream", url=stream_url), InlineKeyboardButton("⬇️ Download", url=download_url)]
+        ])
 
-        keyboard = InlineKeyboardMarkup([buttons])
-
-        text = f"Links for the media:\n\n• Stream: {stream_url}\n"
-        if is_audio:
-            text += f"• Play: {player_url}\n"
-        text += f"• Download: {download_url}"
+        text = f"Links for the media:\n\n• Stream: {stream_url}\n• Download: {download_url}"
         await message.reply_text(text, reply_markup=keyboard, quote=True)
         logger.info(f"Generated links for /fdl command, file_id: {file_id}")
     except Exception as e:
