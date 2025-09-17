@@ -1,12 +1,12 @@
 import logging
 import os
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse
 from pyrogram import Client, filters
 from pyrogram.handlers import MessageHandler
 from pyrogram.errors import PeerIdInvalid
-import psycopg2
-from psycopg2.extras import DictCursor
+import psycopg
+from psycopg.rows import dict_row
 from datetime import datetime
 
 from app.config import BOT_TOKEN, API_ID, API_HASH, WEB_BASE_URL, LOG_CHANNEL_ID, DATABASE_URL
@@ -22,7 +22,7 @@ DB = None
 def init_store():
     global DB
     try:
-        DB = psycopg2.connect(DATABASE_URL, cursor_factory=DictCursor)
+        DB = psycopg.connect(DATABASE_URL, row_factory=dict_row)
         with DB.cursor() as c:
             c.execute(
                 '''CREATE TABLE IF NOT EXISTS files (
@@ -67,6 +67,8 @@ async def startup():
         try:
             await bot.send_message(LOG_CHANNEL_ID, "Bot is now active ✅")
             logger.info(f"Successfully sent test message to channel {LOG_CHANNEL_ID}")
+            # Save session immediately after successful channel access
+            save_session_to_db(DB, session_file)
         except Exception as e:
             logger.error(f"Failed to send test message to channel {LOG_CHANNEL_ID}: {str(e)}")
 
@@ -97,7 +99,7 @@ async def verify_code(file_id: int, code: str) -> bool:
         row = c.fetchone()
         if not row:
             return False
-        db_code, expire_time = row
+        db_code, expire_time = row['code'], row['expire_time']
         return db_code == code and expire_time >= int(datetime.now().timestamp())
 
 @app.get("/stream/{file_id}")
@@ -109,7 +111,7 @@ async def serve_stream(file_id: int, code: str):
         with DB.cursor() as c:
             c.execute("SELECT mime FROM files WHERE file_id = %s", (file_id,))
             row = c.fetchone()
-            mime_type = row[0] if row else "application/octet-stream"
+            mime_type = row['mime'] if row else "application/octet-stream"
 
         return StreamingResponse(
             bot.stream_media(message),
@@ -127,14 +129,16 @@ async def serve_download(file_id: int, code: str):
         with DB.cursor() as c:
             c.execute("SELECT mime FROM files WHERE file_id = %s", (file_id,))
             row = c.fetchone()
-            mime_type = row[0] if row else "application/octet-stream"
+            mime_type = row['mime'] if row else "application/octet-stream"
 
-        # Download to local temp file
-        file_path = await bot.download_media(message)
-        return FileResponse(
-            path=file_path,
+        filename = message.document.file_name if message.document else f"file_{file_id}"
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+        return StreamingResponse(
+            bot.stream_media(message),
             media_type=mime_type,
-            filename=message.document.file_name if message.document else f"file_{file_id}"
+            headers=headers
         )
     except PeerIdInvalid:
         raise HTTPException(status_code=404, detail="File not found")
@@ -147,7 +151,7 @@ async def root():
 async def health():
     try:
         with DB.cursor() as c:
-            c.execute("SELECT COUNT(*) FROM files")
-            return {"status": "ok", "items": c.fetchone()[0]}
+            c.execute("SELECT COUNT(*) AS count FROM files")
+            return {"status": "ok", "items": c.fetchone()['count']}
     except Exception:
         return {"status": "ok"}
