@@ -1,7 +1,7 @@
 import logging
 import os
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from pyrogram import Client, filters
 from pyrogram.handlers import MessageHandler
 from pyrogram.errors import PeerIdInvalid
@@ -17,7 +17,7 @@ logger = logging.getLogger("fdl")
 
 app = FastAPI(title="FDL Bot Server")
 
-# Database connection using PostgreSQL
+# Database connection
 DB = None
 def init_store():
     global DB
@@ -43,7 +43,7 @@ init_store()
 
 session_file = os.path.join(os.getcwd(), "fdl-bot.session")
 
-# Try to load existing session from DB
+# Load previous session (if any) from DB
 load_session_from_db(DB, session_file)
 
 bot = Client(
@@ -54,11 +54,10 @@ bot = Client(
     workdir=os.getcwd()
 )
 
-# Add /start handler
+# Basic command
 @bot.on_message(filters.command("start"))
 async def start_command(client, message):
     await message.reply_text("Hello! I'm FDL Bot. Send me a file or use /fdl to generate download links.")
-    logger.info("Received /start command from user")
 
 @app.on_event("startup")
 async def startup():
@@ -107,9 +106,14 @@ async def serve_stream(file_id: int, code: str):
         raise HTTPException(status_code=404, detail="Invalid or expired link")
     try:
         message = await bot.get_messages(LOG_CHANNEL_ID, file_id)
+        with DB.cursor() as c:
+            c.execute("SELECT mime FROM files WHERE file_id = %s", (file_id,))
+            row = c.fetchone()
+            mime_type = row[0] if row else "application/octet-stream"
+
         return StreamingResponse(
             bot.stream_media(message),
-            media_type=message.media.value.mime_type or "application/octet-stream"
+            media_type=mime_type
         )
     except PeerIdInvalid:
         raise HTTPException(status_code=404, detail="File not found")
@@ -120,11 +124,17 @@ async def serve_download(file_id: int, code: str):
         raise HTTPException(status_code=404, detail="Invalid or expired link")
     try:
         message = await bot.get_messages(LOG_CHANNEL_ID, file_id)
-        file = await bot.download_media(message)
-        return StreamingResponse(
-            file,
-            media_type=message.media.value.mime_type or "application/octet-stream",
-            headers={"Content-Disposition": f"attachment; filename={message.media.value.file_name or f'file_{file_id}'}"}
+        with DB.cursor() as c:
+            c.execute("SELECT mime FROM files WHERE file_id = %s", (file_id,))
+            row = c.fetchone()
+            mime_type = row[0] if row else "application/octet-stream"
+
+        # Download to local temp file
+        file_path = await bot.download_media(message)
+        return FileResponse(
+            path=file_path,
+            media_type=mime_type,
+            filename=message.document.file_name if message.document else f"file_{file_id}"
         )
     except PeerIdInvalid:
         raise HTTPException(status_code=404, detail="File not found")
