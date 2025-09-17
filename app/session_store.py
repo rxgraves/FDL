@@ -1,5 +1,6 @@
-import psycopg2, os
-from psycopg2.extras import DictCursor
+import psycopg
+import os
+from psycopg.rows import dict_row
 import logging
 
 logger = logging.getLogger("session_store")
@@ -20,9 +21,9 @@ def load_session_from_db(db, session_file):
         with db.cursor() as c:
             c.execute("SELECT session_data FROM bot_sessions ORDER BY id DESC LIMIT 1")
             row = c.fetchone()
-            if row and row[0]:
+            if row and row['session_data']:
                 with open(session_file, "wb") as f:
-                    f.write(row[0])
+                    f.write(row['session_data'])
                 logger.info("✅ Loaded session from DB into file %s", session_file)
                 return True
     except Exception as e:
