@@ -1,7 +1,7 @@
 import logging
 import os
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 from pyrogram import Client, filters
 from pyrogram.handlers import MessageHandler
 from pyrogram.errors import PeerIdInvalid
@@ -140,6 +140,46 @@ async def serve_download(file_id: int, code: str):
             media_type=mime_type,
             headers=headers
         )
+    except PeerIdInvalid:
+        raise HTTPException(status_code=404, detail="File not found")
+
+@app.get("/player/{file_id}", response_class=HTMLResponse)
+async def serve_player(file_id: int, code: str):
+    if not await verify_code(file_id, code):
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+    try:
+        with DB.cursor() as c:
+            c.execute("SELECT mime FROM files WHERE file_id = %s", (file_id,))
+            row = c.fetchone()
+            mime_type = row['mime'] if row else "application/octet-stream"
+
+        if not mime_type.startswith("audio/"):
+            raise HTTPException(status_code=400, detail="This file is not an audio file")
+
+        stream_url = WEB_BASE_URL.rstrip("/") + f"/stream/{file_id}?code={code}"
+        download_url = WEB_BASE_URL.rstrip("/") + f"/dl/{file_id}?code={code}"
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>FDL Bot Audio Player</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; }}
+                h1 {{ color: #333; }}
+                audio {{ width: 100%; max-width: 600px; margin-top: 20px; }}
+            </style>
+        </head>
+        <body>
+            <h1>FDL Bot Audio Player</h1>
+            <audio controls>
+                <source src="{stream_url}" type="{mime_type}">
+                Your browser does not support this audio format.
+            </audio>
+            <p>If the audio doesn't play, try downloading the file <a href="{download_url}">here</a>.</p>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
     except PeerIdInvalid:
         raise HTTPException(status_code=404, detail="File not found")
 
