@@ -153,8 +153,8 @@ async def serve_player(file_id: int, code: str):
             row = c.fetchone()
             mime_type = row['mime'] if row else "application/octet-stream"
 
-        if not mime_type.startswith("audio/"):
-            raise HTTPException(status_code=400, detail="This file is not an audio file")
+        if not mime_type.startswith("video/"):
+            raise HTTPException(status_code=400, detail="This file is not a video file")
 
         stream_url = WEB_BASE_URL.rstrip("/") + f"/stream/{file_id}?code={code}"
         download_url = WEB_BASE_URL.rstrip("/") + f"/dl/{file_id}?code={code}"
@@ -162,20 +162,37 @@ async def serve_player(file_id: int, code: str):
         <!DOCTYPE html>
         <html>
         <head>
-            <title>FDL Bot Audio Player</title>
+            <title>FDL Bot Video Player</title>
             <style>
-                body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; }}
-                h1 {{ color: #333; }}
-                audio {{ width: 100%; max-width: 600px; margin-top: 20px; }}
+                body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f0f0f0; }}
+                h1 {{ color: #333; margin-bottom: 20px; }}
+                video {{ width: 100%; max-width: 800px; border: 2px solid #333; border-radius: 5px; }}
+                .controls {{ margin-top: 10px; }}
+                button {{ padding: 10px 20px; margin: 0 5px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }}
+                button:hover {{ background-color: #45a049; }}
             </style>
+            <script>
+                function seekBackward() {{
+                    const video = document.querySelector('video');
+                    const currentTime = video.currentTime;
+                    if (currentTime > 10) {{
+                        video.currentTime = currentTime - 10;
+                    } else {{
+                        video.currentTime = 0;
+                    }}
+                }}
+            </script>
         </head>
         <body>
-            <h1>FDL Bot Audio Player</h1>
-            <audio controls>
+            <h1>FDL Bot Video Player</h1>
+            <video controls>
                 <source src="{stream_url}" type="{mime_type}">
-                Your browser does not support this audio format.
-            </audio>
-            <p>If the audio doesn't play, try downloading the file <a href="{download_url}">here</a>.</p>
+                Your browser does not support this video format.
+            </video>
+            <div class="controls">
+                <button onclick="seekBackward()">-10s</button>
+            </div>
+            <p>If the video doesn't play, try downloading the file <a href="{download_url}">here</a>.</p>
         </body>
         </html>
         """
