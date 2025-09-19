@@ -162,76 +162,26 @@ async def serve_stream_player(file_id: int, code: str):
         <head>
             <title>FDL Stream Player</title>
             <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    text-align: center;
-                    padding: 20px;
-                    background-color: #f0f0f0;
-                    margin: 0;
-                    color: #333;
-                }}
-                h1 {{
-                    color: #333;
-                    margin-bottom: 10px;
-                    font-size: 24px;
-                }}
-                video {{
-                    width: 100%;
-                    max-width: 800px;
-                    border: 2px solid #333;
-                    border-radius: 5px;
-                }}
-                .controls {{
-                    margin: 10px 0;
-                }}
-                .speed-control select {{
-                    padding: 5px;
-                    font-size: 14px;
-                    border: 1px solid #333;
-                    border-radius: 5px;
-                    background-color: #fff;
-                }}
-                .footer {{
-                    margin-top: 20px;
-                    font-size: 14px;
-                    color: #666;
-                }}
-                .footer a {{
-                    color: #4CAF50;
-                    text-decoration: none;
-                }}
-                .footer a:hover {{
-                    text-decoration: underline;
-                }}
+                body {{ font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f0f0f0; margin: 0; }}
+                .container {{ max-width: 800px; margin: 0 auto; }}
+                h1 {{ color: #333; margin-bottom: 10px; font-size: 24px; }}
+                video {{ width: 100%; border: 2px solid #333; border-radius: 5px; }}
+                .footer {{ margin-top: 20px; font-size: 14px; color: #333; }}
+                a {{ color: #4CAF50; text-decoration: none; }}
+                a:hover {{ text-decoration: underline; }}
             </style>
-            <script>
-                const video = document.querySelector('video');
-                const speedSelect = document.querySelector('#speed');
-                const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 3, 4, 6, 8, 12];
-                speeds.forEach(speed => {
-                    const option = document.createElement('option');
-                    option.value = speed;
-                    option.text = speed + 'x';
-                    speedSelect.appendChild(option);
-                });
-                speedSelect.addEventListener('change', () => {
-                    video.playbackRate = speedSelect.value;
-                });
-            </script>
         </head>
         <body>
-            <h1>FDL Stream Player - For PC and Mobile</h1>
-            <div class="controls">
-                <label for="speed">Speed: </label>
-                <select id="speed"></select>
-            </div>
-            <video controls>
-                <source src="{stream_url}" type="{mime_type}">
-                Your browser does not support this video format.
-            </video>
-            <div class="footer">
-                <p>If the stream doesn't play, try downloading the file <a href="{download_url}">⬇️ Download</a>.</p>
-                <p><a href="https://t.me/TG-FDL" target="_blank">📢 Join TG-FDL</a></p>
+            <div class="container">
+                <h1>FDL Stream Player - For PC and Mobile</h1>
+                <video controls>
+                    <source src="{stream_url}" type="{mime_type}">
+                    Your browser does not support this video format.
+                </video>
+                <div class="footer">
+                    <p>If the stream doesn't play, try downloading the file <a href="{download_url}">⬇️ Download</a>.</p>
+                    <p><a href="https://t.me/TG-FDL" target="_blank">📢 Join TG-FDL</a></p>
+                </div>
             </div>
         </body>
         </html>
