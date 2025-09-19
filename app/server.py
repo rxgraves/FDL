@@ -143,18 +143,16 @@ async def serve_download(file_id: int, code: str):
     except PeerIdInvalid:
         raise HTTPException(status_code=404, detail="File not found")
 
-@app.get("/player/{file_id}", response_class=HTMLResponse)
-async def serve_player(file_id: int, code: str):
+@app.get("/stream/{file_id}", response_class=HTMLResponse)
+async def serve_stream_player(file_id: int, code: str):
     if not await verify_code(file_id, code):
         raise HTTPException(status_code=404, detail="Invalid or expired link")
     try:
+        message = await bot.get_messages(LOG_CHANNEL_ID, file_id)
         with DB.cursor() as c:
             c.execute("SELECT mime FROM files WHERE file_id = %s", (file_id,))
             row = c.fetchone()
             mime_type = row['mime'] if row else "application/octet-stream"
-
-        if not mime_type.startswith("video/"):
-            raise HTTPException(status_code=400, detail="This file is not a video file")
 
         stream_url = WEB_BASE_URL.rstrip("/") + f"/stream/{file_id}?code={code}"
         download_url = WEB_BASE_URL.rstrip("/") + f"/dl/{file_id}?code={code}"
@@ -162,7 +160,7 @@ async def serve_player(file_id: int, code: str):
         <!DOCTYPE html>
         <html>
         <head>
-            <title>FDL Bot Video Player</title>
+            <title>FDL Bot Stream Player</title>
             <style>
                 body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f0f0f0; }}
                 h1 {{ color: #333; margin-bottom: 20px; }}
@@ -175,40 +173,4 @@ async def serve_player(file_id: int, code: str):
                 function seekBackward() {{
                     const video = document.querySelector('video');
                     const currentTime = video.currentTime;
-                    if (currentTime > 10) {{
-                        video.currentTime = currentTime - 10;
-                    }} else {{
-                        video.currentTime = 0;
-                    }}
-                }}
-            </script>
-        </head>
-        <body>
-            <h1>FDL Bot Video Player</h1>
-            <video controls>
-                <source src="{stream_url}" type="{mime_type}">
-                Your browser does not support this video format.
-            </video>
-            <div class="controls">
-                <button onclick="seekBackward()">-10s</button>
-            </div>
-            <p>If the video doesn't play, try downloading the file <a href="{download_url}">here</a>.</p>
-        </body>
-        </html>
-        """
-        return HTMLResponse(content=html_content)
-    except PeerIdInvalid:
-        raise HTTPException(status_code=404, detail="File not found")
-
-@app.get("/")
-async def root():
-    return {"status": "running", "message": "FDL Bot is alive"}
-
-@app.get("/_health")
-async def health():
-    try:
-        with DB.cursor() as c:
-            c.execute("SELECT COUNT(*) AS count FROM files")
-            return {"status": "ok", "items": c.fetchone()['count']}
-    except Exception:
-        return {"status": "ok"}
+                    if (currentTime >
