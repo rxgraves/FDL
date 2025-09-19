@@ -143,11 +143,12 @@ async def serve_download(file_id: int, code: str):
     except PeerIdInvalid:
         raise HTTPException(status_code=404, detail="File not found")
 
-@app.get("/stream-player/{file_id}")
-async def serve_stream_player(file_id: int, code: str, response_class=HTMLResponse):
+@app.get("/stream-player/{file_id}", response_class=HTMLResponse)
+async def serve_stream_player(file_id: int, code: str):
     if not await verify_code(file_id, code):
         raise HTTPException(status_code=404, detail="Invalid or expired link")
     try:
+        message = await bot.get_messages(LOG_CHANNEL_ID, file_id)
         with DB.cursor() as c:
             c.execute("SELECT mime FROM files WHERE file_id = %s", (file_id,))
             row = c.fetchone()
@@ -161,35 +162,67 @@ async def serve_stream_player(file_id: int, code: str, response_class=HTMLRespon
         <head>
             <title>FDL Stream Player</title>
             <style>
-                body {{ font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f0f0f0; margin: 0; }}
-                h1 {{ color: #333; margin-bottom: 10px; }}
-                video {{ width: 100%; max-width: 800px; border: 2px solid #333; border-radius: 5px; }}
-                .footer {{ margin-top: 20px; font-size: 14px; color: #666; }}
-                .speed-control {{ margin: 10px 0; }}
-                select {{ padding: 5px; font-size: 14px; }}
-                .join-link {{ margin-top: 10px; }}
-                a {{ color: #4CAF50; text-decoration: none; }}
-                a:hover {{ text-decoration: underline; }}
+                body {{
+                    font-family: Arial, sans-serif;
+                    text-align: center;
+                    padding: 20px;
+                    background-color: #f0f0f0;
+                    margin: 0;
+                    color: #333;
+                }}
+                h1 {{
+                    color: #333;
+                    margin-bottom: 10px;
+                    font-size: 24px;
+                }}
+                video {{
+                    width: 100%;
+                    max-width: 800px;
+                    border: 2px solid #333;
+                    border-radius: 5px;
+                }}
+                .controls {{
+                    margin: 10px 0;
+                }}
+                .speed-control select {{
+                    padding: 5px;
+                    font-size: 14px;
+                    border: 1px solid #333;
+                    border-radius: 5px;
+                    background-color: #fff;
+                }}
+                .footer {{
+                    margin-top: 20px;
+                    font-size: 14px;
+                    color: #666;
+                }}
+                .footer a {{
+                    color: #4CAF50;
+                    text-decoration: none;
+                }}
+                .footer a:hover {{
+                    text-decoration: underline;
+                }}
             </style>
             <script>
                 const video = document.querySelector('video');
-                const speedSelect = document.querySelector('select');
+                const speedSelect = document.querySelector('#speed');
                 const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 3, 4, 6, 8, 12];
-                speeds.forEach(speed => {{
+                speeds.forEach(speed => {
                     const option = document.createElement('option');
                     option.value = speed;
                     option.text = speed + 'x';
                     speedSelect.appendChild(option);
-                }});
-                speedSelect.addEventListener('change', () => {{
+                });
+                speedSelect.addEventListener('change', () => {
                     video.playbackRate = speedSelect.value;
-                }});
+                });
             </script>
         </head>
         <body>
             <h1>FDL Stream Player - For PC and Mobile</h1>
-            <div class="speed-control">
-                <label for="speed">Playback Speed: </label>
+            <div class="controls">
+                <label for="speed">Speed: </label>
                 <select id="speed"></select>
             </div>
             <video controls>
@@ -198,9 +231,7 @@ async def serve_stream_player(file_id: int, code: str, response_class=HTMLRespon
             </video>
             <div class="footer">
                 <p>If the stream doesn't play, try downloading the file <a href="{download_url}">⬇️ Download</a>.</p>
-                <div class="join-link">
-                    <a href="https://t.me/fdl_rg_bot" target="_blank">📢 Join TG-FDL</a>
-                </div>
+                <p><a href="https://t.me/TG-FDL" target="_blank">📢 Join TG-FDL</a></p>
             </div>
         </body>
         </html>
