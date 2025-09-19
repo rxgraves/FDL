@@ -1,7 +1,7 @@
 import logging
 import os
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 from pyrogram import Client, filters
 from pyrogram.handlers import MessageHandler
 from pyrogram.errors import PeerIdInvalid
@@ -140,6 +140,72 @@ async def serve_download(file_id: int, code: str):
             media_type=mime_type,
             headers=headers
         )
+    except PeerIdInvalid:
+        raise HTTPException(status_code=404, detail="File not found")
+
+@app.get("/stream-player/{file_id}")
+async def serve_stream_player(file_id: int, code: str, response_class=HTMLResponse):
+    if not await verify_code(file_id, code):
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+    try:
+        with DB.cursor() as c:
+            c.execute("SELECT mime FROM files WHERE file_id = %s", (file_id,))
+            row = c.fetchone()
+            mime_type = row['mime'] if row else "application/octet-stream"
+
+        stream_url = WEB_BASE_URL.rstrip("/") + f"/stream/{file_id}?code={code}"
+        download_url = WEB_BASE_URL.rstrip("/") + f"/dl/{file_id}?code={code}"
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>FDL Stream Player</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f0f0f0; margin: 0; }}
+                h1 {{ color: #333; margin-bottom: 10px; }}
+                video {{ width: 100%; max-width: 800px; border: 2px solid #333; border-radius: 5px; }}
+                .footer {{ margin-top: 20px; font-size: 14px; color: #666; }}
+                .speed-control {{ margin: 10px 0; }}
+                select {{ padding: 5px; font-size: 14px; }}
+                .join-link {{ margin-top: 10px; }}
+                a {{ color: #4CAF50; text-decoration: none; }}
+                a:hover {{ text-decoration: underline; }}
+            </style>
+            <script>
+                const video = document.querySelector('video');
+                const speedSelect = document.querySelector('select');
+                const speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 3, 4, 6, 8, 12];
+                speeds.forEach(speed => {{
+                    const option = document.createElement('option');
+                    option.value = speed;
+                    option.text = speed + 'x';
+                    speedSelect.appendChild(option);
+                }});
+                speedSelect.addEventListener('change', () => {{
+                    video.playbackRate = speedSelect.value;
+                }});
+            </script>
+        </head>
+        <body>
+            <h1>FDL Stream Player - For PC and Mobile</h1>
+            <div class="speed-control">
+                <label for="speed">Playback Speed: </label>
+                <select id="speed"></select>
+            </div>
+            <video controls>
+                <source src="{stream_url}" type="{mime_type}">
+                Your browser does not support this video format.
+            </video>
+            <div class="footer">
+                <p>If the stream doesn't play, try downloading the file <a href="{download_url}">⬇️ Download</a>.</p>
+                <div class="join-link">
+                    <a href="https://t.me/TG-FDL" target="_blank">📢 Join TG-FDL</a>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
     except PeerIdInvalid:
         raise HTTPException(status_code=404, detail="File not found")
 
