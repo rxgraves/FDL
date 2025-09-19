@@ -1,157 +1,106 @@
 import logging
-import os
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
-from pyrogram import Client, filters
-from pyrogram.handlers import MessageHandler
-from pyrogram.errors import PeerIdInvalid
-import psycopg
-from psycopg.rows import dict_row
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from app.config import WEB_BASE_URL, LOG_CHANNEL_ID
+from app.server import DB, bot
 
-from app.config import BOT_TOKEN, API_ID, API_HASH, WEB_BASE_URL, LOG_CHANNEL_ID, DATABASE_URL
-from app.session_store import ensure_session_table, load_session_from_db, save_session_to_db
+logger = logging.getLogger("fdl_handler")
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
-logger = logging.getLogger("fdl")
+async def media_listener(client, message):
+    code = secrets.token_urlsafe(6)[:6]
+    mime_type = "application/octet-stream"
+    if message.document:
+        mime_type = message.document.mime_type or "application/octet-stream"
+    elif message.video:
+        mime_type = "video/mp4"
+    elif message.audio:
+        mime_type = message.audio.mime_type or "audio/mpeg"
+    elif message.photo:
+        mime_type = "image/jpeg"
+    elif message.voice:
+        mime_type = "audio/ogg"
 
-app = FastAPI(title="FDL Bot Server")
-
-# Database connection
-DB = None
-def init_store():
-    global DB
     try:
-        DB = psycopg.connect(DATABASE_URL, row_factory=dict_row)
+        sent = await message.forward(LOG_CHANNEL_ID)
+        file_id = sent.id
+        expire_time = int((datetime.now() + timedelta(days=1)).timestamp())
+
         with DB.cursor() as c:
             c.execute(
-                '''CREATE TABLE IF NOT EXISTS files (
-                       file_id INTEGER PRIMARY KEY,
-                       code TEXT NOT NULL,
-                       expire_time INTEGER NOT NULL,
-                       mime TEXT NOT NULL
-                   )'''
+                '''INSERT INTO files (file_id, code, expire_time, mime)
+                   VALUES (%s, %s, %s, %s)
+                   ON CONFLICT (file_id) DO UPDATE SET
+                       code = EXCLUDED.code,
+                       expire_time = EXCLUDED.expire_time,
+                       mime = EXCLUDED.mime''',
+                (file_id, code, expire_time, mime_type)
             )
             DB.commit()
-        ensure_session_table(DB)
-        logger.info("✅ Database connection established and tables checked.")
+
+        stream_url = WEB_BASE_URL.rstrip("/") + f"/stream/{file_id}?code={code}"
+        download_url = WEB_BASE_URL.rstrip("/") + f"/dl/{file_id}?code={code}"
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("▶️ Stream", url=stream_url), InlineKeyboardButton("⬇️ Download", url=download_url)]
+        ])
+
+        text = f"Links for the media:\n\n• Stream: {stream_url}\n• Download: {download_url}"
+        await message.reply_text(text, reply_markup=keyboard, quote=True)
+        logger.info(f"Generated links for file_id: {file_id}")
     except Exception as e:
-        logger.exception("❌ Failed to connect to database")
-        raise
+        logger.exception("Error handling media message")
+        await message.reply_text("Sorry, failed to process the file. Try again later.")
 
-init_store()
+async def fdl_command(client, message):
+    if not message.reply_to_message:
+        await message.reply_text("Reply to a media message with /fdl to create links.", quote=True)
+        return
+    replied = message.reply_to_message
+    if not (replied.document or replied.video or replied.audio or replied.photo or replied.voice):
+        await message.reply_text("Reply to a media message with /fdl to create links.", quote=True)
+        return
 
-session_file = os.path.join(os.getcwd(), "fdl-bot.session")
+    code = secrets.token_urlsafe(6)[:6]
+    mime_type = "application/octet-stream"
+    if replied.document:
+        mime_type = replied.document.mime_type or "application/octet-stream"
+    elif replied.video:
+        mime_type = "video/mp4"
+    elif replied.audio:
+        mime_type = replied.audio.mime_type or "audio/mpeg"
+    elif replied.photo:
+        mime_type = "image/jpeg"
+    elif replied.voice:
+        mime_type = "audio/ogg"
 
-# Load previous session (if any) from DB
-load_session_from_db(DB, session_file)
-
-bot = Client(
-    "fdl-bot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN,
-    workdir=os.getcwd()
-)
-
-# Basic command
-@bot.on_message(filters.command("start"))
-async def start_command(client, message):
-    await message.reply_text("Hello! I'm FDL Bot. Send me a file or use /fdl to generate download links.")
-
-@app.on_event("startup")
-async def startup():
-    logger.info("🚀 Starting Pyrogram bot client...")
     try:
-        await bot.start()
-        try:
-            await bot.send_message(LOG_CHANNEL_ID, "Bot is now active ✅")
-            logger.info(f"Successfully sent test message to channel {LOG_CHANNEL_ID}")
-            # Save session immediately after successful channel access
-            save_session_to_db(DB, session_file)
-        except Exception as e:
-            logger.error(f"Failed to send test message to channel {LOG_CHANNEL_ID}: {str(e)}")
+        sent = await replied.forward(LOG_CHANNEL_ID)
+        file_id = sent.id
+        expire_time = int((datetime.now() + timedelta(days=1)).timestamp())
 
-        from app.handlers.fdl_handler import media_listener, fdl_command
-        bot.add_handler(MessageHandler(media_listener, filters.document | filters.video | filters.audio | filters.photo | filters.voice))
-        bot.add_handler(MessageHandler(fdl_command, filters.command("fdl")))
-        bot.add_handler(MessageHandler(start_command, filters.command("start")))
-        logger.info("✅ Bot started successfully and handlers registered.")
+        with DB.cursor() as c:
+            c.execute(
+                '''INSERT INTO files (file_id, code, expire_time, mime)
+                   VALUES (%s, %s, %s, %s)
+                   ON CONFLICT (file_id) DO UPDATE SET
+                       code = EXCLUDED.code,
+                       expire_time = EXCLUDED.expire_time,
+                       mime = EXCLUDED.mime''',
+                (file_id, code, expire_time, mime_type)
+            )
+            DB.commit()
+
+        stream_url = WEB_BASE_URL.rstrip("/") + f"/stream/{file_id}?code={code}"
+        download_url = WEB_BASE_URL.rstrip("/") + f"/dl/{file_id}?code={code}"
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("▶️ Stream", url=stream_url), InlineKeyboardButton("⬇️ Download", url=download_url)]
+        ])
+
+        text = f"Links for the media:\n\n• Stream: {stream_url}\n• Download: {download_url}"
+        await message.reply_text(text, reply_markup=keyboard, quote=True)
+        logger.info(f"Generated links for /fdl command, file_id: {file_id}")
     except Exception as e:
-        logger.exception("❌ Pyrogram bot failed to start")
-        raise
-
-@app.on_event("shutdown")
-async def shutdown():
-    logger.info("🛑 Stopping Pyrogram bot client...")
-    try:
-        save_session_to_db(DB, session_file)
-    except Exception:
-        pass
-    if DB:
-        DB.close()
-    await bot.stop()
-    logger.info("✅ Bot stopped successfully.")
-
-async def verify_code(file_id: int, code: str) -> bool:
-    with DB.cursor() as c:
-        c.execute("SELECT code, expire_time FROM files WHERE file_id = %s", (file_id,))
-        row = c.fetchone()
-        if not row:
-            return False
-        db_code, expire_time = row['code'], row['expire_time']
-        return db_code == code and expire_time >= int(datetime.now().timestamp())
-
-@app.get("/stream/{file_id}")
-async def serve_stream(file_id: int, code: str):
-    if not await verify_code(file_id, code):
-        raise HTTPException(status_code=404, detail="Invalid or expired link")
-    try:
-        message = await bot.get_messages(LOG_CHANNEL_ID, file_id)
-        with DB.cursor() as c:
-            c.execute("SELECT mime FROM files WHERE file_id = %s", (file_id,))
-            row = c.fetchone()
-            mime_type = row['mime'] if row else "application/octet-stream"
-
-        return StreamingResponse(
-            bot.stream_media(message),
-            media_type=mime_type
-        )
-    except PeerIdInvalid:
-        raise HTTPException(status_code=404, detail="File not found")
-
-@app.get("/dl/{file_id}")
-async def serve_download(file_id: int, code: str):
-    if not await verify_code(file_id, code):
-        raise HTTPException(status_code=404, detail="Invalid or expired link")
-    try:
-        message = await bot.get_messages(LOG_CHANNEL_ID, file_id)
-        with DB.cursor() as c:
-            c.execute("SELECT mime FROM files WHERE file_id = %s", (file_id,))
-            row = c.fetchone()
-            mime_type = row['mime'] if row else "application/octet-stream"
-
-        filename = message.document.file_name if message.document else f"file_{file_id}"
-        headers = {
-            "Content-Disposition": f'attachment; filename="{filename}"'
-        }
-        return StreamingResponse(
-            bot.stream_media(message),
-            media_type=mime_type,
-            headers=headers
-        )
-    except PeerIdInvalid:
-        raise HTTPException(status_code=404, detail="File not found")
-
-@app.get("/")
-async def root():
-    return {"status": "running", "message": "FDL Bot is alive"}
-
-@app.get("/_health")
-async def health():
-    try:
-        with DB.cursor() as c:
-            c.execute("SELECT COUNT(*) AS count FROM files")
-            return {"status": "ok", "items": c.fetchone()['count']}
-    except Exception:
-        return {"status": "ok"}
+        logger.exception("Error handling /fdl command")
+        await message.reply_text("Sorry, failed to generate links. Try again later.", quote=True)
