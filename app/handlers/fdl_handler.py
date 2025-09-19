@@ -10,19 +10,18 @@ logger = logging.getLogger("fdl_handler")
 async def media_listener(client, message):
     code = secrets.token_urlsafe(6)[:6]
     mime_type = "application/octet-stream"
-    is_audio = False
+    is_video = False
     if message.document:
         mime_type = message.document.mime_type or "application/octet-stream"
     elif message.video:
         mime_type = "video/mp4"
+        is_video = True
     elif message.audio:
         mime_type = message.audio.mime_type or "audio/mpeg"
-        is_audio = True
     elif message.photo:
         mime_type = "image/jpeg"
     elif message.voice:
         mime_type = "audio/ogg"
-        is_audio = True
 
     try:
         sent = await message.forward(LOG_CHANNEL_ID)
@@ -48,14 +47,14 @@ async def media_listener(client, message):
             InlineKeyboardButton("▶️ Stream", url=stream_url),
             InlineKeyboardButton("⬇️ Download", url=download_url)
         ]
-        if is_audio:
+        if is_video:
             player_url = WEB_BASE_URL.rstrip("/") + f"/player/{file_id}?code={code}"
-            buttons.insert(1, InlineKeyboardButton("🎵 Play", url=player_url))
+            buttons.insert(1, InlineKeyboardButton("🎥 Play", url=player_url))
 
         keyboard = InlineKeyboardMarkup([buttons])
 
         text = f"Links for the media:\n\n• Stream: {stream_url}\n"
-        if is_audio:
+        if is_video:
             text += f"• Play: {player_url}\n"
         text += f"• Download: {download_url}"
         await message.reply_text(text, reply_markup=keyboard, quote=True)
@@ -75,19 +74,18 @@ async def fdl_command(client, message):
 
     code = secrets.token_urlsafe(6)[:6]
     mime_type = "application/octet-stream"
-    is_audio = False
+    is_video = False
     if replied.document:
         mime_type = replied.document.mime_type or "application/octet-stream"
     elif replied.video:
         mime_type = "video/mp4"
+        is_video = True
     elif replied.audio:
         mime_type = replied.audio.mime_type or "audio/mpeg"
-        is_audio = True
     elif replied.photo:
         mime_type = "image/jpeg"
     elif replied.voice:
         mime_type = "audio/ogg"
-        is_audio = True
 
     try:
         sent = await replied.forward(LOG_CHANNEL_ID)
@@ -113,14 +111,14 @@ async def fdl_command(client, message):
             InlineKeyboardButton("▶️ Stream", url=stream_url),
             InlineKeyboardButton("⬇️ Download", url=download_url)
         ]
-        if is_audio:
+        if is_video:
             player_url = WEB_BASE_URL.rstrip("/") + f"/player/{file_id}?code={code}"
-            buttons.insert(1, InlineKeyboardButton("🎵 Play", url=player_url))
+            buttons.insert(1, InlineKeyboardButton("🎥 Play", url=player_url))
 
         keyboard = InlineKeyboardMarkup([buttons])
 
         text = f"Links for the media:\n\n• Stream: {stream_url}\n"
-        if is_audio:
+        if is_video:
             text += f"• Play: {player_url}\n"
         text += f"• Download: {download_url}"
         await message.reply_text(text, reply_markup=keyboard, quote=True)
