@@ -68,7 +68,7 @@ async def fdl_command(client, message):
     elif replied.video:
         mime_type = "video/mp4"
     elif replied.audio:
-        mime_type = replied.audio.mime_type or "audio/mpeg"
+        mime_type = message.audio.mime_type or "audio/mpeg"
     elif replied.photo:
         mime_type = "image/jpeg"
     elif replied.voice:
@@ -100,7 +100,4 @@ async def fdl_command(client, message):
 
         text = f"Links for the media:\n\n• Stream: {stream_url}\n• Download: {download_url}"
         await message.reply_text(text, reply_markup=keyboard, quote=True)
-        logger.info(f"Generated links for /fdl command, file_id: {file_id}")
-    except Exception as e:
-        logger.exception("Error handling /fdl command")
-        await message.reply_text("Sorry, failed to generate links. Try again later.", quote=True)
+        logger.info(f"Generated links for
