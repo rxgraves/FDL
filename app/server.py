@@ -1,7 +1,7 @@
 import logging
 import os
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse, HTMLResponse
+from fastapi.responses import StreamingResponse
 from pyrogram import Client, filters
 from pyrogram.handlers import MessageHandler
 from pyrogram.errors import PeerIdInvalid
@@ -140,53 +140,6 @@ async def serve_download(file_id: int, code: str):
             media_type=mime_type,
             headers=headers
         )
-    except PeerIdInvalid:
-        raise HTTPException(status_code=404, detail="File not found")
-
-@app.get("/stream-player/{file_id}", response_class=HTMLResponse)
-async def serve_stream_player(file_id: int, code: str):
-    if not await verify_code(file_id, code):
-        raise HTTPException(status_code=404, detail="Invalid or expired link")
-    try:
-        message = await bot.get_messages(LOG_CHANNEL_ID, file_id)
-        with DB.cursor() as c:
-            c.execute("SELECT mime FROM files WHERE file_id = %s", (file_id,))
-            row = c.fetchone()
-            mime_type = row['mime'] if row else "application/octet-stream"
-
-        stream_url = WEB_BASE_URL.rstrip("/") + f"/stream/{file_id}?code={code}"
-        download_url = WEB_BASE_URL.rstrip("/") + f"/dl/{file_id}?code={code}"
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>FDL Stream Player</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f0f0f0; margin: 0; }}
-                .container {{ max-width: 800px; margin: 0 auto; }}
-                h1 {{ color: #333; margin-bottom: 10px; font-size: 24px; }}
-                video {{ width: 100%; border: 2px solid #333; border-radius: 5px; }}
-                .footer {{ margin-top: 20px; font-size: 14px; color: #333; }}
-                a {{ color: #4CAF50; text-decoration: none; }}
-                a:hover {{ text-decoration: underline; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>FDL Stream Player - For PC and Mobile</h1>
-                <video controls>
-                    <source src="{stream_url}" type="{mime_type}">
-                    Your browser does not support this video format.
-                </video>
-                <div class="footer">
-                    <p>If the stream doesn't play, try downloading the file <a href="{download_url}">⬇️ Download</a>.</p>
-                    <p><a href="https://t.me/TG-FDL" target="_blank">📢 Join TG-FDL</a></p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        return HTMLResponse(content=html_content)
     except PeerIdInvalid:
         raise HTTPException(status_code=404, detail="File not found")
 
