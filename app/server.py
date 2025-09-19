@@ -177,7 +177,7 @@ async def serve_player(file_id: int, code: str):
                     const currentTime = video.currentTime;
                     if (currentTime > 10) {{
                         video.currentTime = currentTime - 10;
-                    } else {{
+                    }} else {{
                         video.currentTime = 0;
                     }}
                 }}
