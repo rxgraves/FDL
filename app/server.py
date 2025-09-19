@@ -173,4 +173,40 @@ async def serve_stream_player(file_id: int, code: str):
                 function seekBackward() {{
                     const video = document.querySelector('video');
                     const currentTime = video.currentTime;
-                    if (currentTime >
+                    if (currentTime > 10) {{
+                        video.currentTime = currentTime - 10;
+                    }} else {{
+                        video.currentTime = 0;
+                    }}
+                }}
+            </script>
+        </head>
+        <body>
+            <h1>FDL Bot Stream Player</h1>
+            <video controls>
+                <source src="{stream_url}" type="{mime_type}">
+                Your browser does not support this video format.
+            </video>
+            <div class="controls">
+                <button onclick="seekBackward()">-10s</button>
+            </div>
+            <p>If the stream doesn't play, try downloading the file <a href="{download_url}">⬇️ Download</a>.</p>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content)
+    except PeerIdInvalid:
+        raise HTTPException(status_code=404, detail="File not found")
+
+@app.get("/")
+async def root():
+    return {"status": "running", "message": "FDL Bot is alive"}
+
+@app.get("/_health")
+async def health():
+    try:
+        with DB.cursor() as c:
+            c.execute("SELECT COUNT(*) AS count FROM files")
+            return {"status": "ok", "items": c.fetchone()['count']}
+    except Exception:
+        return {"status": "ok"}
