@@ -38,7 +38,7 @@ async def media_listener(client, message):
             )
             DB.commit()
 
-        stream_url = WEB_BASE_URL.rstrip("/") + f"/stream/{file_id}?code={code}"
+        stream_url = WEB_BASE_URL.rstrip("/") + f"/stream-player/{file_id}?code={code}"
         download_url = WEB_BASE_URL.rstrip("/") + f"/dl/{file_id}?code={code}"
 
         keyboard = InlineKeyboardMarkup([
@@ -91,7 +91,7 @@ async def fdl_command(client, message):
             )
             DB.commit()
 
-        stream_url = WEB_BASE_URL.rstrip("/") + f"/stream/{file_id}?code={code}"
+        stream_url = WEB_BASE_URL.rstrip("/") + f"/stream-player/{file_id}?code={code}"
         download_url = WEB_BASE_URL.rstrip("/") + f"/dl/{file_id}?code={code}"
 
         keyboard = InlineKeyboardMarkup([
