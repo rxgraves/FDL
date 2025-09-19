@@ -199,7 +199,7 @@ async def serve_stream_player(file_id: int, code: str, response_class=HTMLRespon
             <div class="footer">
                 <p>If the stream doesn't play, try downloading the file <a href="{download_url}">⬇️ Download</a>.</p>
                 <div class="join-link">
-                    <a href="https://t.me/TG-FDL" target="_blank">📢 Join TG-FDL</a>
+                    <a href="https://t.me/fdl_rg_bot" target="_blank">📢 Join TG-FDL</a>
                 </div>
             </div>
         </body>
